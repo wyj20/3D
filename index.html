@@ -25,16 +25,20 @@
         .filter-toggle.active { border-color: var(--main); color: var(--main); background: #f0fbfc; }
         
         .filter-tray { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #fff; }
-        .filter-tray.active { max-height: 120px; padding-top: 10px; padding-bottom: 5px; }
+        .filter-tray.active { max-height: 140px; padding-top: 10px; padding-bottom: 5px; }
         
-        .scroll-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 8px; align-items: center; }
+        /* 丝滑滚动控制 */
+        .scroll-row { 
+            display: flex; gap: 12px; overflow-x: auto; white-space: nowrap; padding: 5px 5px 12px 5px; align-items: center;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+        }
         .scroll-row::-webkit-scrollbar { display: none; }
         
-        .palette-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; flex-shrink: 0; cursor: pointer; }
+        .palette-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; flex-shrink: 0; cursor: pointer; }
         .palette-dot.active { border-color: var(--main); transform: scale(1.15); box-shadow: 0 0 5px rgba(0,172,193,0.3); }
-        .palette-dot.clear { background: #eee; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #777; border-radius: 6px; width: 35px; }
+        .palette-dot.clear { background: #eee; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #777; border-radius: 8px; width: 40px; height: 24px; flex-shrink: 0; }
 
-        .filter-dot { padding: 4px 10px; border-radius: 12px; font-size: 0.65rem; background: #f2f2f2; color: #666; white-space: nowrap; border: 1px solid transparent; }
+        .filter-dot { padding: 6px 12px; border-radius: 14px; font-size: 0.7rem; background: #f2f2f2; color: #666; white-space: nowrap; border: 1px solid transparent; flex-shrink: 0; }
         .filter-dot.active { background: #e0f7f9; color: var(--main); border-color: var(--main); font-weight: bold; }
 
         .container { padding: 12px; display: grid; grid-template-columns: repeat(var(--grid-cols), 1fr); gap: 12px; align-content: start; }
@@ -60,7 +64,7 @@
         .btn-danger { background: var(--danger); color: white; }
         .btn-success { background: var(--success); color: white; }
         
-        .btn-hold-init { position: relative; width: 100%; background: transparent; border: 1.5px solid var(--danger); color: var(--danger); border-radius: 12px; padding: 14px; font-size: 0.9rem; font-weight: bold; overflow: hidden; cursor: pointer; user-select: none; -webkit-user-select: none; }
+        .btn-hold-init { position: relative; width: 100%; background: transparent; border: 1.5px solid var(--danger); color: var(--danger); border-radius: 12px; padding: 14px; font-size: 0.9rem; font-weight: bold; overflow: hidden; cursor: pointer; user-select: none; }
         #holdProgress { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: rgba(255,82,82,0.25); transition: width 0.1s linear; }
 
         .fab { position: fixed; bottom: 25px; right: 25px; width: 68px; height: 68px; background: var(--main); color: white; border-radius: 50%; border: none; font-size: 38px; box-shadow: 0 8px 20px rgba(0,172,193,0.4); z-index: 99; display: flex; align-items: center; justify-content: center; }
@@ -106,14 +110,14 @@
     <div style="margin-bottom:12px;"><label style="font-size:0.75rem;color:#999;">材质类型</label><input type="text" id="inType" class="sync-input"><div id="typeTags" class="tag-container"></div></div>
     <div style="margin-bottom:12px;"><label style="font-size:0.75rem;color:#999;">补充说明 (备注)</label><input type="text" id="inNotes" placeholder="独立属性标记" class="sync-input"></div>
     <div style="margin-bottom:12px;"><label style="font-size:0.75rem;color:#999;">色块标识</label><input type="color" id="inColor" value="#00acc1" style="width:100%;height:45px;border:none;border-radius:8px;"></div>
-    <div id="countRow" style="margin-bottom:12px;"><label style="font-size:0.75rem;color:#999;">入库数量</label><input type="number" id="inCount" value="1" min="1" oninput="if(this.value<1)this.value='1'" class="sync-input"></div>
+    <div id="countRow" style="margin-bottom:12px;"><label style="font-size:0.75rem;color:#999;">入库数量</label><input type="number" id="inCount" value="1" onclick="this.select()" onfocus="this.select()" class="sync-input"></div>
     <div class="btn-row"><button class="btn btn-cancel" onclick="closeModals()">放弃</button><button class="btn btn-main" id="saveNewBtn" onclick="saveNew()">确认入库</button></div>
 </div></div>
 
 <div id="adjustModal" class="modal"><div class="modal-content"><div style="font-weight:bold;font-size:1.2rem;text-align:center;margin-bottom:20px;">库存量精确调整</div>
     <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin:25px 0;">
         <button style="width:65px;height:65px;font-size:2rem;border-radius:15px;border:1px solid #ddd;background:#fcfcfc" onclick="stepAdjust(-1)">-</button>
-        <input type="number" id="adjNum" style="width:110px;height:65px;text-align:center;font-size:2rem;font-weight:bold;border:2px solid var(--main);border-radius:15px;outline:none;" oninput="if(this.value<1)this.value=1">
+        <input type="number" id="adjNum" style="width:110px;height:65px;text-align:center;font-size:2rem;font-weight:bold;border:2px solid var(--main);border-radius:15px;outline:none;" onclick="this.select()" onfocus="this.select()">
         <button style="width:65px;height:65px;font-size:2rem;border-radius:15px;border:1px solid #ddd;background:#fcfcfc" onclick="stepAdjust(1)">+</button>
     </div>
     <div style="text-align:center; margin-bottom:15px;"><a href="javascript:void(0)" style="color:var(--main); font-size:0.85rem; font-weight:bold; text-decoration:none;" onclick="openEditMode()">✎ 修订资料属性</a></div>
@@ -121,7 +125,7 @@
     <button class="btn btn-danger" style="width:100%; margin-top:20px; font-size:0.9rem;" onclick="closeModals(); setTimeout(requestDelete, 100)">彻底移除该记录</button>
 </div></div>
 
-<input type="file" id="localRestoreInput" style="display:none" accept=".json" onchange="importLocalBackup(this)">
+<input type="file" id="localRestoreInput" style="display:none" accept="*/*" onchange="importLocalBackup(this)">
 
 <button id="fab" class="fab" onclick="openNewMode()">+</button>
 
@@ -144,21 +148,30 @@
     function toggleFilterTray() { const tray = document.getElementById('filterTray'); const btn = document.getElementById('filterBtn'); tray.classList.toggle('active'); btn.classList.toggle('active'); }
 
     function triggerLocalRestore() { document.getElementById('localRestoreInput').click(); }
+    
+    /* 🆕 强化版导入逻辑：支持全类型文件选择 + 结构指纹校验 */
     function importLocalBackup(input) {
         const file = input.files[0]; if (!file) return; const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const imported = JSON.parse(e.target.result); if (!imported.sealed || !imported.config) throw new Error();
+                const imported = JSON.parse(e.target.result);
+                // 结构指纹校验：确保是 3D-FIMS 生成的数据
+                if (!imported.sealed || !imported.config || !Array.isArray(imported.sealed)) {
+                    throw new Error("Invalid Structure");
+                }
                 const currentSync = { token: db.settings.ghToken, repo: db.settings.ghRepo };
                 db = imported; db.settings.ghToken = currentSync.token; db.settings.ghRepo = currentSync.repo;
                 saveDB(); render(); showNotice("恢复成功", "本地备份镜像已完整导入");
-            } catch(err) { showNotice("非法文件", "所选文件格式不正确", "error"); }
+            } catch(err) { 
+                showNotice("非法文件", "所选文件不是有效的 3D-FIMS 备份数据", "error"); 
+            }
         }; reader.readAsText(file); input.value = "";
     }
 
     function exportLocalBackup() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
-        const downloadAnchor = document.createElement('a'); const timestamp = new Date().toLocaleString().replace(/[\/\s:]/g, '-');
+        const downloadAnchor = document.createElement('a'); const now = new Date();
+        const timestamp = now.getFullYear() + "-" + (now.getMonth()+1) + "-" + now.getDate() + "-" + now.getHours() + "-" + now.getMinutes();
         downloadAnchor.setAttribute("href", dataStr); downloadAnchor.setAttribute("download", `3D-FIMS_Backup_${timestamp}.json`);
         document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove();
         showNotice("导出完成", "物理离线存档已生成");
@@ -168,7 +181,7 @@
         const pBox = document.getElementById('paletteBar'); if (!pBox || currentTab === 'settings') return;
         const colors = [...new Set(db[currentTab].map(i => i.color))];
         pBox.innerHTML = `<div class="palette-dot clear" onclick="setColorFilter('')">重置</div>` + 
-            colors.map(c => `<div class="palette-dot ${activeColor===c?'active':''}" style="background:${c}" onclick="setColorFilter('${c}')"></div>`).join('');
+            colors.map(c => `<div class="palette-dot ${activeColor===c?'active':''}" style="background:${c}" onclick="setColorFilter('${c}')"></div>`).join('') + `<div style="width:30px;flex-shrink:0;"></div>`;
     }
 
     function setColorFilter(c) { activeColor = c; render(); }
@@ -206,7 +219,7 @@
             const num = t === '全部' ? db[currentTab].reduce((s,i)=>s+i.count,0) : (counts[t] || 0);
             if (num === 0 && t !== '全部' && activeFilter !== t) return '';
             return `<div class="filter-dot ${activeFilter === t || (!activeFilter && t === '全部') ? 'active' : ''}" onclick="setFilter('${t}')">${t} · ${num}</div>`;
-        }).join('');
+        }).join('') + `<div style="width:30px;flex-shrink:0;"></div>`;
     }
 
     function setFilter(f) { activeFilter = f === '全部' ? '' : f; render(); }
@@ -230,7 +243,7 @@
         }
 
         renderFilters(); renderPalette();
-        if (currentTab === 'finished') { container.innerHTML = `<div style="grid-column: span var(--grid-cols); text-align:center; padding: 20px 0;"><div style="font-size:3.5rem; font-weight:900; color:var(--main);">${db.finished.reduce((s,i)=>s+i.count,0)}</div><p style="color:#666; font-weight:bold; margin-bottom:15px;">全周期累计消耗总量</p><button class="btn btn-danger-outline" style="font-size:0.8rem; padding:8px 25px; border-radius:10px; width:auto; border:1.5px solid var(--danger); background:none; color:var(--danger)" onclick="requestClearFinished()">重置结算记录</button></div>`; }
+        if (currentTab === 'finished') { container.innerHTML = `<div style="grid-column: span var(--grid-cols); text-align:center; padding: 20px 0;"><div style="font-size:3.5rem; font-weight:900; color:var(--main);">${db.finished.reduce((s,i)=>s+i.count,0)}</div><p style="color:#666; font-weight:bold; margin-bottom:15px;">全周期累计消耗总量</p><button class="btn btn-danger-outline" style="font-size:0.8rem; padding:8px 25px; border-radius:10px; width:auto; border:1.5px solid var(--danger); background:none; color:var(--danger)" onclick="requestClearFinished()">重置记录</button></div>`; }
         
         let listData = db[currentTab] || [];
         let sorted = [...listData].sort((a,b) => {
@@ -268,7 +281,7 @@
 
     function requestDelTag(c, v) {
         document.getElementById('warnIcon').innerText = '⚠️'; document.getElementById('warnIcon').style.color = 'var(--warn)';
-        showCustomWarn("标签管理", `确定要永久移除 [${v}] 属性吗？`, "放弃", "btn-cancel", closeModals, "确定删除", "btn-danger", () => {
+        showCustomWarn("管理属性标签", `确定要永久移除 [${v}] 吗？`, "放弃", "btn-cancel", closeModals, "确定删除", "btn-danger", () => {
             let l = c === 'Brand' ? db.config.brands : db.config.types; let i = l.indexOf(v); if (i > -1) l.splice(i, 1); saveDB(); renderTags(); closeModals();
         });
     }
@@ -283,57 +296,34 @@
         if(document.getElementById('typeTags')) document.getElementById('typeTags').innerHTML = build('Type', db.config.types);
     }
 
-    /* 🆕 强化长按初始化逻辑 */
-    function startHold(e) {
-        e.preventDefault();
-        holdProgress = 0;
-        const bar = document.getElementById('holdProgress');
-        holdTimer = setInterval(() => {
-            holdProgress += 3.33;
-            if(bar) bar.style.width = holdProgress + '%';
-            if (holdProgress >= 100) { clearInterval(holdTimer); endHold(); requestReset(); }
-        }, 100);
-    }
-    function endHold() {
-        clearInterval(holdTimer);
-        holdProgress = 0;
-        const bar = document.getElementById('holdProgress');
-        if(bar) bar.style.width = '0%';
-    }
+    function startHold(e) { e.preventDefault(); holdProgress = 0; const bar = document.getElementById('holdProgress'); holdTimer = setInterval(() => { holdProgress += 3.33; if(bar) bar.style.width = holdProgress + '%'; if (holdProgress >= 100) { clearInterval(holdTimer); endHold(); requestReset(); } }, 100); }
+    function endHold() { clearInterval(holdTimer); holdProgress = 0; const bar = document.getElementById('holdProgress'); if(bar) bar.style.width = '0%'; }
 
     function openNewMode() { isEditMode = false; document.getElementById('modalActionTitle').innerText = '耗材入库登记'; document.getElementById('saveNewBtn').innerText = '确认入库'; document.getElementById('countRow').style.display = 'block'; showModal('newModal'); }
     function openEditMode() { isEditMode = true; closeModals(); const item = db[activeFrom][activeIdx]; document.getElementById('inBrand').value = item.brand; document.getElementById('inType').value = item.type; document.getElementById('inNotes').value = item.notes || ''; document.getElementById('inColor').value = item.color; document.getElementById('modalActionTitle').innerText = '修订资料属性'; document.getElementById('saveNewBtn').innerText = '保存修订'; document.getElementById('countRow').style.display = 'none'; showModal('newModal'); }
     function saveNew() {
         const b = document.getElementById('inBrand').value.trim(), t = document.getElementById('inType').value.trim(), c = document.getElementById('inColor').value, nts = document.getElementById('inNotes').value.trim();
         if (!b || !t) return; if (!db.config.brands.includes(b)) db.config.brands.push(b); if (!db.config.types.includes(t)) db.config.types.push(t);
+        let n = parseInt(document.getElementById('inCount').value); if (isNaN(n) || n < 1) n = 1;
         if (isEditMode) db[activeFrom][activeIdx] = { ...db[activeFrom][activeIdx], brand: b, type: t, color: c, notes: nts };
-        else { let n = parseInt(document.getElementById('inCount').value) || 1; let exist = db.sealed.find(i => i.brand === b && i.type === t && i.color === c && i.notes === nts); if (exist) exist.count += n; else db.sealed.push({ brand: b, type: t, color: c, count: n, notes: nts }); }
+        else { let exist = db.sealed.find(i => i.brand === b && i.type === t && i.color === c && i.notes === nts); if (exist) exist.count += n; else db.sealed.push({ brand: b, type: t, color: c, count: n, notes: nts }); }
         saveDB(); render(); closeModals(); document.getElementById('inBrand').value = ''; document.getElementById('inType').value = ''; document.getElementById('inNotes').value = ''; document.getElementById('inCount').value = '1';
     }
 
-    /* 🆕 彻底清空逻辑 */
-    function requestReset() { 
-        document.getElementById('warnIcon').innerText = '⚠️'; document.getElementById('warnIcon').style.color = 'var(--warn)'; 
-        showCustomWarn("系统初始化确认", "该操作将抹除所有本地耗材数据。建议先导出存档。确认初始化？", "放弃", "btn-cancel", closeModals, "确认重置", "btn-danger", () => { 
-            localStorage.clear(); // 物理清空
-            showNotice("重置成功", "系统即将重新加载...");
-            setTimeout(() => { location.reload(); }, 1500); // 1.5秒后强制刷新页面
-        }); 
-    }
-    
+    function requestReset() { document.getElementById('warnIcon').innerText = '⚠️'; document.getElementById('warnIcon').style.color = 'var(--warn)'; showCustomWarn("初始化确认", "该操作将抹除所有本地耗材数据。建议先导出存档。确认重置？", "放弃", "btn-cancel", closeModals, "确认重置", "btn-danger", () => { localStorage.clear(); showNotice("重置成功", "系统即将重新加载..."); setTimeout(() => { location.reload(); }, 1500); }); }
     function requestClearFinished() { document.getElementById('warnIcon').innerText = '⚠️'; document.getElementById('warnIcon').style.color = 'var(--warn)'; showCustomWarn("记录清空确认", "确定要抹除所有历史统计记录吗？", "取消", "btn-cancel", closeModals, "确定清空", "btn-danger", () => { db.finished = []; saveDB(); render(); closeModals(); }); }
     function requestDelete() { const item = db[activeFrom][activeIdx]; document.getElementById('warnIcon').innerText = '⚠️'; document.getElementById('warnIcon').style.color = 'var(--warn)'; showCustomWarn("移除确认", `确定永久移除记录【${item.brand} ${item.type}】？`, "取消", "btn-cancel", closeModals, "确定移除", "btn-danger", () => { db[activeFrom].splice(activeIdx, 1); saveDB(); render(); closeModals(); }); }
     function confirmAdj() { let n = parseInt(document.getElementById('adjNum').value); if (isNaN(n) || n < 1) n = 1; db[activeFrom][activeIdx].count = n; saveDB(); render(); closeModals(); }
     function checkUnseal(idx) { let item = db.sealed[idx]; let dup = db.inuse.concat(db.opened).find(i => i.brand === item.brand && i.type === item.type && i.color === item.color); if (dup) { document.getElementById('warnIcon').innerText = '⚠️'; document.getElementById('warnIcon').style.color = 'var(--warn)'; showCustomWarn("状态预警", "相同规格耗材已处于开启状态，确认重复开启？", "放弃", "btn-cancel", closeModals, "确认开启", "btn-main", () => { doUnseal(idx); }); } else doUnseal(idx); }
     function doUnseal(idx) { let item = db.sealed[idx]; item.count--; if(item.count<=0) db.sealed.splice(idx,1); let exist = db.inuse.find(i=>i.brand===item.brand && i.type===item.type && i.color===item.color && i.notes===item.notes); if(exist) exist.count++; else db.inuse.push({...item, count:1}); saveDB(); render(); closeModals(); }
-    function confirmFinish(idx, f) { activeIdx = idx; activeFrom = f; document.getElementById('warnIcon').innerText = '📦'; document.getElementById('warnIcon').style.color = 'var(--main)'; showCustomWarn("核销确认", "请选择结算方式：", "全额核销", "btn-danger", () => { doFinish('all'); }, "核销 1 卷", "btn-main", () => { doFinish(1); }); }
+    function confirmFinish(idx, f) { activeIdx = idx; activeFrom = f; document.getElementById('warnIcon').innerText = '📦'; document.getElementById('warnIcon').style.color = 'var(--main)'; showCustomWarn("结算确认", "请选择本批次结算方式：", "全额核销", "btn-danger", () => { doFinish('all'); }, "核销 1 卷", "btn-main", () => { doFinish(1); }); }
     function doFinish(m) { let item = db[activeFrom][activeIdx], n = (m===1)?1:item.count; let exist = db.finished.find(i => i.brand === item.brand && i.type === item.type && i.color === item.color && i.notes === item.notes); if(exist) exist.count += n; else db.finished.push({...item, count:n}); if(m===1) { item.count--; if(item.count<=0) db[activeFrom].splice(activeIdx,1); } else db[activeFrom].splice(activeIdx,1); saveDB(); render(); closeModals(); }
     function move(idx, f, t) { let item = db[f].splice(idx, 1)[0], exist = db[t].find(i=>i.brand===item.brand && i.type===item.type && i.color===item.color && i.notes===item.notes); if(exist) exist.count += item.count; else db[t].push(item); saveDB(); render(); }
     function switchTab(t) { currentTab = t; document.getElementById('searchInput').value = ''; activeFilter = ''; activeColor = ''; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); if(event) event.currentTarget.classList.add('active'); render(); }
     function showCustomWarn(t, m, lT, lC, lF, rT, rC, rF) { document.getElementById('warnTitle').innerText = t; document.getElementById('warnMsg').innerText = m; const lB = document.getElementById('warnLeftBtn'), rB = document.getElementById('warnRightBtn'); if(lC==="hide"){lB.style.display="none"}else{lB.style.display="block";lB.innerText = lT; lB.className = "btn " + lC; lB.onclick = lF;} rB.innerText = rT; rB.className = "btn " + rC; rB.onclick = rF; document.getElementById('warnModal').style.display = 'flex'; }
     function updateSort(v) { db.settings.sortOrder = v; saveDB(); render(); }
     function updateCols(n) { db.settings.columns = n; saveDB(); render(); }
-    function addTag(c) { let v = prompt("属性标签名称:"); if(v) { let l = c==='Brand'?db.config.brands:db.config.types; if(!l.includes(v))l.push(v); renderTags(); saveDB(); } }
+    function addTag(c) { let v = prompt("输入新属性标签:"); if(v) { let l = c==='Brand'?db.config.brands:db.config.types; if(!l.includes(v))l.push(v); renderTags(); saveDB(); } }
     function setIn(id, v) { document.getElementById(id).value = v; }
     function stepAdjust(v) { let el = document.getElementById('adjNum'); el.value = Math.max(1, (parseInt(el.value)||1)+v); }
     function updateCounts() { ['sealed','inuse','opened','finished'].forEach(k => { const el = document.getElementById('cnt-'+k); if(el) el.innerText = db[k].reduce((s,i)=>s+(parseInt(i.count)||0),0); }); }
