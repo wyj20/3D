@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D-FIMS Core Next v4.1</title>
+    <title>3D-FIMS Core Next v4.2</title>
     <style>
         :root {
             --main: #00acc1; --bg: #f8f9fa; --nav: #212121; 
@@ -139,7 +139,7 @@
     let RAW_DB = JSON.parse(localStorage.getItem('FIMS_NEXT_DB'));
     let STATE = RAW_DB ? Migrator.fix(RAW_DB) : Migrator.fix({}); 
 
-    /* v4.1 Fixed Sync Logic */
+    /* v4.2 Cloud Engine: Smart Creation & Strict Timestamp */
     const SyncCenter = {
         setStatus(status) { const el = document.getElementById('sync-dot'); if(el) el.className = 'sync-status ' + status; },
         export() { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(STATE)); a.download=`FIMS_${Date.now()}.json`; a.click(); },
@@ -149,29 +149,49 @@
         async push() {
             const { ghToken: t, ghRepo: r } = STATE.settings;
             if(!t || !r) return Toast.show("请先填写 Token 和 仓库路径");
-            this.setStatus('working'); Toast.show("正在上传云端...");
+            this.setStatus('working'); Toast.show("☁️ 正在连接云端...");
+            
             try {
                 const url = `https://api.github.com/repos/${r}/contents/data.json`, headers = { 'Authorization': `token ${t}` };
-                let sha = ""; const g = await fetch(url, { headers }); if(g.ok) sha = (await g.json()).sha;
-                const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify({ message: "Manual Push", content: btoa(unescape(encodeURIComponent(JSON.stringify(STATE)))), sha })});
+                
+                // 1. Check if file exists to get SHA
+                let sha = null;
+                const checkRes = await fetch(url, { headers });
+                if(checkRes.ok) {
+                    const data = await checkRes.json();
+                    sha = data.sha;
+                }
+
+                // 2. Construct Payload (Do NOT send SHA if new file)
+                const payload = {
+                    message: "Manual Push via FIMS",
+                    content: btoa(unescape(encodeURIComponent(JSON.stringify(STATE))))
+                };
+                if(sha) payload.sha = sha;
+
+                // 3. Perform PUT
+                const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(payload) });
                 
                 if(res.ok) { 
-                    // v4.1 Fix: Update time ONLY after success
-                    STATE.settings.lastSyncTime = new Date().toLocaleString();
+                    STATE.settings.lastSyncTime = new Date().toLocaleString(); // Only update on 200 OK
                     Core.save(); 
                     this.setStatus('active'); 
                     if(Router.activeTab === 'settings') SettingsUI.render(document.querySelector('.view-settings > div'));
                     Toast.show("✅ 上传成功"); 
-                } else throw new Error();
-            } catch(e) { this.setStatus('error'); Toast.show("❌ 上传失败: Token 或网络错误"); }
+                } else {
+                    const err = await res.json();
+                    console.error(err);
+                    throw new Error();
+                }
+            } catch(e) { this.setStatus('error'); Toast.show("❌ 上传失败: 请检查 Token 权限"); }
         },
 
         async pull() {
             const { ghToken: t, ghRepo: r } = STATE.settings;
             if(!t || !r) return Toast.show("请先填写 Token 和 仓库路径");
-            // v4.1 Fix: Use closeWarn which now calls closeAll
+            
             Portal.confirm("⚠️ 高危操作", "云端数据将覆盖当前所有数据，不可撤销。", "取消", Portal.closeWarn, "确定覆盖", async () => {
-                Portal.closeAll(); // v4.1 Fix: Immediately unlock screen
+                Portal.closeAll(); 
                 this.setStatus('working'); Toast.show("正在拉取数据...");
                 try {
                     const url = `https://api.github.com/repos/${r}/contents/data.json`, headers = { 'Authorization': `token ${t}` };
@@ -179,7 +199,6 @@
                     if(res.ok) {
                         const json = await res.json();
                         const content = JSON.parse(decodeURIComponent(escape(window.atob(json.content))));
-                        // v4.1 Fix: Async render to prevent UI freeze
                         requestAnimationFrame(() => {
                             setTimeout(() => {
                                 STATE = Migrator.fix(content);
@@ -189,8 +208,11 @@
                                 Toast.show("✅ 恢复成功");
                             }, 50);
                         });
+                    } else if (res.status === 404) {
+                        Toast.show("⚠️ 云端暂无数据");
+                        this.setStatus('error');
                     } else throw new Error();
-                } catch(e) { this.setStatus('error'); Toast.show("❌ 拉取失败: 无数据或 Token 错误"); }
+                } catch(e) { this.setStatus('error'); Toast.show("❌ 拉取失败: Token 错误"); }
             });
         },
 
@@ -198,11 +220,19 @@
             const { ghToken: t, ghRepo: r } = STATE.settings; if(!t || !r) return;
             try { 
                 const url = `https://api.github.com/repos/${r}/contents/data.json`, headers = { 'Authorization': `token ${t}` };
-                let sha = ""; const g = await fetch(url, { headers }); if(g.ok) sha = (await g.json()).sha;
-                const now = new Date().toLocaleString(); STATE.settings.lastSyncTime = now;
-                await fetch(url, { method: 'PUT', headers, body: JSON.stringify({ message: "Auto Sync", content: btoa(unescape(encodeURIComponent(JSON.stringify(STATE)))), sha })});
-                this.setStatus('active');
-                if(Router.activeTab === 'settings') SettingsUI.render(document.querySelector('.view-settings > div'));
+                let sha = null;
+                const checkRes = await fetch(url, { headers });
+                if(checkRes.ok) sha = (await checkRes.json()).sha;
+
+                const payload = { message: "Auto Sync", content: btoa(unescape(encodeURIComponent(JSON.stringify(STATE)))) };
+                if(sha) payload.sha = sha;
+
+                const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(payload) });
+                if(res.ok) {
+                    STATE.settings.lastSyncTime = new Date().toLocaleString(); // Only update on success
+                    this.setStatus('active');
+                    if(Router.activeTab === 'settings') SettingsUI.render(document.querySelector('.view-settings > div'));
+                }
             } catch(e) { this.setStatus('error'); } 
         }
     };
@@ -326,7 +356,6 @@
     const Portal = {
         open(id) { document.getElementById(id).style.display = 'flex'; document.body.classList.add('modal-lock'); },
         closeAll() { document.querySelectorAll('.fims-portal').forEach(p => p.style.display = 'none'); document.body.classList.remove('modal-lock'); document.body.removeAttribute('style'); },
-        // v4.1 Fix: Now calls closeAll to properly remove locks
         closeWarn() { this.closeAll(); },
         confirm(t, m, lT, lF, rT, rF) { document.getElementById('warnTitle').innerText = t; document.getElementById('warnMsg').innerText = m; const lB = document.getElementById('warnLBtn'), rB = document.getElementById('warnRBtn'); lB.innerText = lT; lB.className = "fims-btn btn-ghost"; lB.onclick = lF; rB.innerText = rT; rB.className = rT ? "fims-btn btn-danger" : "fims-btn btn-ghost"; if(rT) { rB.style.display='flex'; rB.onclick = rF; } else rB.style.display='none'; this.open('warnPortal'); }
     };
