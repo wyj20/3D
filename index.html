@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D-FIMS Core Next v4.4</title>
+    <title>3D-FIMS Core Next v4.5</title>
     <style>
         :root {
             --main: #00acc1; --bg: #f8f9fa; --nav: #212121; 
@@ -139,71 +139,60 @@
     let RAW_DB = JSON.parse(localStorage.getItem('FIMS_NEXT_DB'));
     let STATE = RAW_DB ? Migrator.fix(RAW_DB) : Migrator.fix({}); 
 
-    /* v4.4 Cloud Engine: Bearer Token & White-space Sanitizer */
+    /* v4.5 Data Sanitization for Cloud Sync */
     const SyncCenter = {
         setStatus(status) { const el = document.getElementById('sync-dot'); if(el) el.className = 'sync-status ' + status; },
         export() { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(STATE)); a.download=`FIMS_${Date.now()}.json`; a.click(); },
         triggerImport() { document.getElementById('importInput').click(); },
         importFile(input) { const file = input.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if(data.inventory && data.settings) { Portal.closeAll(); document.body.removeAttribute('style'); requestAnimationFrame(() => { setTimeout(() => { STATE = Migrator.fix(data); Core.save(); Router.render(); Toast.show("导入成功"); }, 50); }); } else throw new Error(); } catch(err) { Toast.show("文件无效"); } }; reader.readAsText(file); input.value = ''; },
         
+        // Helper: Create safe copy without Token
+        getSanitizedState() {
+            const safeState = JSON.parse(JSON.stringify(STATE)); // Deep clone
+            if(safeState.settings) delete safeState.settings.ghToken; // Remove Secret
+            return safeState;
+        },
+
         async push() {
             let { ghToken: t, ghRepo: r } = STATE.settings;
-            // v4.4 Fix 1: Aggressive Trimming
-            t = t ? t.trim() : '';
-            r = r ? r.trim().replace('https://github.com/', '').replace('.git', '') : '';
+            t = t ? t.trim() : ''; r = r ? r.trim().replace('https://github.com/', '').replace('.git', '') : '';
             
             if(!t || !r) return Toast.show("请先填写配置");
-            
-            // v4.4 Fix 2: Auto-save trimmed values to avoid re-error
-            if(t !== STATE.settings.ghToken || r !== STATE.settings.ghRepo) {
-                STATE.settings.ghToken = t;
-                STATE.settings.ghRepo = r;
-                Core.save();
-                if(Router.activeTab === 'settings') SettingsUI.render(document.querySelector('.view-settings > div'));
-            }
+            if(t !== STATE.settings.ghToken || r !== STATE.settings.ghRepo) { STATE.settings.ghToken = t; STATE.settings.ghRepo = r; Core.save(); if(Router.activeTab === 'settings') SettingsUI.render(document.querySelector('.view-settings > div')); }
 
             this.setStatus('working'); Toast.show("☁️ 正在连接云端...");
             
             try {
-                // v4.4 Fix 3: Use 'Bearer' scheme instead of 'token' for better compatibility
                 const url = `https://api.github.com/repos/${r}/contents/data.json`;
                 const headers = { 'Authorization': `Bearer ${t}`, 'Accept': 'application/vnd.github+json' };
                 
                 let sha = null;
                 const checkRes = await fetch(url, { headers });
-                
-                if(checkRes.ok) {
-                    sha = (await checkRes.json()).sha;
-                } else if(checkRes.status !== 404) {
-                    const errData = await checkRes.json().catch(()=>({}));
-                    const errMsg = errData.message || checkRes.statusText;
-                    throw new Error(`${checkRes.status}|${errMsg}`);
-                }
+                if(checkRes.ok) sha = (await checkRes.json()).sha;
+                else if(checkRes.status !== 404) { const e = await checkRes.json().catch(()=>({})); throw new Error(`${checkRes.status}|${e.message||checkRes.statusText}`); }
 
-                const payload = { message: "Manual Push via FIMS", content: btoa(unescape(encodeURIComponent(JSON.stringify(STATE)))) };
+                // v4.5 Fix: Upload SANITIZED state (no token)
+                const payload = { 
+                    message: "Manual Push via FIMS", 
+                    content: btoa(unescape(encodeURIComponent(JSON.stringify(this.getSanitizedState())))) 
+                };
                 if(sha) payload.sha = sha;
 
                 const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(payload) });
-                
                 if(res.ok) { 
                     STATE.settings.lastSyncTime = new Date().toLocaleString();
                     localStorage.setItem('FIMS_NEXT_DB', JSON.stringify(STATE));
                     this.setStatus('active'); 
                     if(Router.activeTab === 'settings') SettingsUI.render(document.querySelector('.view-settings > div'));
                     Toast.show("✅ 上传成功"); 
-                } else {
-                    const errData = await res.json().catch(()=>({}));
-                    const errMsg = errData.message || res.statusText;
-                    throw new Error(`${res.status}|${errMsg}`);
-                }
+                } else { const e = await res.json().catch(()=>({})); throw new Error(`${res.status}|${e.message||res.statusText}`); }
             } catch(e) { 
                 this.setStatus('error'); 
-                const parts = e.message.split('|');
-                const code = parts[0];
-                const msg = parts[1] || '';
+                const [code, msg] = e.message.split('|');
                 let tip = `❌ 错误 ${code}`;
-                if(code == '401') tip += "\nToken 无效或权限不足\n请检查 'repo' 权限勾选";
-                else if(code == '404') tip += "\n仓库未找到\n请检查路径: 用户名/仓库名";
+                if(code == '401') tip += "\nToken 无效 (检查权限)";
+                else if(code == '404') tip += "\n仓库未找到 (检查路径)";
+                else if(code == '409') tip += "\n触发安全拦截\n(检测到 Token 泄漏, 已自动修复, 请重试)"; // v4.5 Special Hint
                 else tip += `\n${msg}`;
                 alert(tip);
             }
@@ -211,9 +200,7 @@
 
         async pull() {
             let { ghToken: t, ghRepo: r } = STATE.settings;
-            t = t ? t.trim() : '';
-            r = r ? r.trim().replace('https://github.com/', '').replace('.git', '') : '';
-
+            t = t ? t.trim() : ''; r = r ? r.trim().replace('https://github.com/', '').replace('.git', '') : '';
             if(!t || !r) return Toast.show("请先填写配置");
             
             Portal.confirm("⚠️ 高危操作", "云端数据将覆盖本地，确定？", "取消", Portal.closeWarn, "确定覆盖", async () => {
@@ -226,6 +213,11 @@
                     if(res.ok) {
                         const json = await res.json();
                         const content = JSON.parse(decodeURIComponent(escape(window.atob(json.content))));
+                        
+                        // v4.5 Fix: Restore local token if cloud data is sanitized
+                        if(!content.settings.ghToken && t) content.settings.ghToken = t;
+                        if(content.settings.ghRepo !== r) content.settings.ghRepo = r;
+
                         requestAnimationFrame(() => {
                             setTimeout(() => {
                                 STATE = Migrator.fix(content);
@@ -233,14 +225,8 @@
                                 this.setStatus('active'); Toast.show("✅ 恢复成功");
                             }, 50);
                         });
-                    } else {
-                        const errData = await res.json().catch(()=>({}));
-                        throw new Error(`${res.status}|${errData.message}`);
-                    }
-                } catch(e) { 
-                    this.setStatus('error'); 
-                    alert(`❌ 拉取失败: ${e.message}`);
-                }
+                    } else { const e = await res.json().catch(()=>({})); throw new Error(`${res.status}|${e.message}`); }
+                } catch(e) { this.setStatus('error'); alert(`❌ 拉取失败: ${e.message}`); }
             });
         },
 
@@ -252,10 +238,13 @@
                 const headers = { 'Authorization': `Bearer ${t}`, 'Accept': 'application/vnd.github+json' };
                 let sha = null;
                 const checkRes = await fetch(url, { headers });
-                if(checkRes.ok) sha = (await checkRes.json()).sha;
-                else if(checkRes.status !== 404) return;
+                if(checkRes.ok) sha = (await checkRes.json()).sha; else if(checkRes.status !== 404) return;
 
-                const payload = { message: "Auto Sync", content: btoa(unescape(encodeURIComponent(JSON.stringify(STATE)))) };
+                // v4.5 Fix: Sanitize Auto-Sync too
+                const payload = { 
+                    message: "Auto Sync", 
+                    content: btoa(unescape(encodeURIComponent(JSON.stringify(this.getSanitizedState())))) 
+                };
                 if(sha) payload.sha = sha;
 
                 const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(payload) });
@@ -355,7 +344,6 @@
         openFinishModal() { Portal.open('finishPortal'); }, doFinish(all) { Core.moveItem(this.activeIdx, this.activeTab, 'finished', all); }, requestDelete() { Portal.confirm("删除", "永久删除此记录？", "取消", Portal.closeWarn, "删除", () => Core.deleteItem(this.activeIdx, this.activeTab)); },
         toEditMode() { Portal.closeAll(); const item = STATE.inventory[this.activeTab][this.activeIdx]; InventoryUI.editMode = true; InventoryUI.editIdx = this.activeIdx; document.getElementById('entryTitle').innerText = '修订资料'; document.getElementById('inBrand').value = item.brand; document.getElementById('inType').value = item.type; document.getElementById('inNotes').value = item.notes || ''; document.getElementById('inColorPicker1').value = item.color; if(item.color2) document.getElementById('inColorPicker2').value = item.color2; document.getElementById('inCount').value = item.count; InventoryUI.switchColorMode(item.colorMode || 'solid'); InventoryUI.renderTagCloud(); setTimeout(() => Portal.open('entryPortal'), 50); }
     };
-    /* Settings UI */
     const SettingsUI = {
         holdTimer: null, holdProgress: 0,
         render(app) { 
@@ -365,8 +353,8 @@
                 
                 <div class="settings-block">
                     <div class="settings-header">云端同步 (GitHub)</div>
-                    <input type="password" id="ghToken" class="form-input" value="${STATE.settings.ghToken}" placeholder="GitHub Token" onchange="STATE.settings.ghToken=this.value.trim();Core.save()">
-                    <input type="text" id="ghRepo" class="form-input" value="${STATE.settings.ghRepo}" placeholder="仓库路径 (user/repo)" onchange="STATE.settings.ghRepo=this.value.trim();Core.save()">
+                    <input type="password" id="ghToken" class="form-input" value="${STATE.settings.ghToken}" placeholder="GitHub Token" onchange="STATE.settings.ghToken=this.value">
+                    <input type="text" id="ghRepo" class="form-input" value="${STATE.settings.ghRepo}" placeholder="仓库路径 (user/repo)" onchange="STATE.settings.ghRepo=this.value">
                     
                     <div class="cloud-console">
                         <div class="cloud-time">🕒 最近同步: ${STATE.settings.lastSyncTime || '未同步'}</div>
